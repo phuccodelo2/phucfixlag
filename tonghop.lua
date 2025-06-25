@@ -88,8 +88,8 @@ RunScriptBtn.BackgroundColor3 = Color3.fromRGB(30, 120, 50)
 RunScriptBtn.TextColor3 = Color3.new(1, 1, 1)
 
 RunScriptBtn.MouseButton1Click:Connect(function()
-	loadstring(game:HttpGet("loadstring(game:HttpGet("https://raw.githubusercontent.com/phuccodelo2/Phucmax/main/autofruit.lua"))()"))()
-end)
+
+	end)
 
 -- Tab Cài Đặt
 SettingTab.Name = "SettingTab"
