@@ -37,7 +37,7 @@ Logo.Parent = MainFrame
 Logo.Size = UDim2.new(0, 32, 0, 32)
 Logo.Position = UDim2.new(0, -40, 0, 10)
 Logo.BackgroundTransparency = 1
-Logo.Image = "rbxassetid://139344694264003" -- Logo đoàn hoàn
+Logo.Image = "rbxassetid://123394707028201" -- Logo đoàn hoàn
 
 -- Nút bật/tắt menu
 ToggleButton.Name = "ToggleButton"
