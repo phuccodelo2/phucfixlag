@@ -25,8 +25,6 @@ toggleButton.BackgroundTransparency = 1
 toggleButton.Parent = screenGui
 
 local isFluentVisible = true
-
--- ⬇️ Kéo nút
 local dragging, dragInput, dragStart, startPos
 local UserInputService = game:GetService("UserInputService")
 toggleButton.InputBegan:Connect(function(input)
@@ -53,22 +51,35 @@ UserInputService.InputChanged:Connect(function(input)
         )
     end
 end)
-
--- ⬇️ Bấm nút để ẩn/hiện UI
 toggleButton.MouseButton1Click:Connect(function()
     isFluentVisible = not isFluentVisible
     Window:Minimize(not isFluentVisible)
 end)
 
--- ⬇️ Khởi tạo tab chính
+-- ⬇️ Tab chính
 local MainTab = Window:AddTab({
     Title = "main",
     Icon = "home"
 })
 
+-- ⬇️ Service & biến toàn cục
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UIS = game:GetService("UserInputService")
+getgenv()._espLock = false
+getgenv()._espTargetPosition = nil
+
+-- ⬇️ Danh sách toạ độ base
+local basePositions = {
+    Vector3.new(-519.3, 12.9, -134.7),
+    Vector3.new(-519.4, 12.9, -25.7),
+    Vector3.new(-520.3, 12.9, 80.5),
+    Vector3.new(-520.5, 12.9, 188.0),
+    Vector3.new(-299.4, 12.9, -65.5),
+    Vector3.new(-300.7, 12.9, 145.5),
+    Vector3.new(-300.8, 12.9, 39.2),
+    Vector3.new(-299.5, 12.9, 254.9)
+}
 
 -- ✅ Nút: Ascend to Floor 1
 MainTab:AddButton({
@@ -128,36 +139,6 @@ MainTab:AddToggle({
     end
 })
 
-MainTab:AddButton({
-    Title = "Lure Base",
-    Description = "Đặt ESP vào base gần nhất",
-    Callback = function()
-        local Players = game:GetService("Players")
-        local LocalPlayer = Players.LocalPlayer
-        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hrp = char:WaitForChild("HumanoidRootPart")
-
-        local closestPos = nil
-        local closestDist = math.huge
-
-        for _, pos in pairs(basePositions) do
-            local dist = (hrp.Position - pos).Magnitude
-            if dist < closestDist then
-                closestDist = dist
-                closestPos = pos
-            end
-        end
-
-        if closestPos then
-            getgenv()._espTargetPosition = closestPos
-            getgenv()._espLock = true
-            print("save your base you stay at home new save ", tostring(closestPos))
-        else
-            warn("error")
-        end
-    end
-})
-
 -- ✅ Toggle: Anti-Hit
 local dodgeFly = false
 MainTab:AddToggle({
@@ -168,9 +149,6 @@ MainTab:AddToggle({
         dodgeFly = state
     end
 })
-
-
-
 task.spawn(function()
     while task.wait(0.02) do
         if dodgeFly and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -205,6 +183,34 @@ MainTab:AddToggle({
             end)
         else
             if jumpConn then jumpConn:Disconnect() jumpConn = nil end
+        end
+    end
+})
+
+-- ✅ Nút: Lure Base (ESP Lock gần nhất)
+MainTab:AddButton({
+    Title = "Lure Base",
+    Description = "To save your base you must be in your base. ",
+    Callback = function()
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        local closestPos = nil
+        local closestDist = math.huge
+        for _, pos in pairs(basePositions) do
+            local dist = (hrp.Position - pos).Magnitude
+            if dist < closestDist then
+                closestDist = dist
+                closestPos = pos
+            end
+        end
+
+        if closestPos then
+            getgenv()._espTargetPosition = closestPos
+            getgenv()._espLock = true
+            print("Saved base location at:", tostring(closestPos))
+        else
+            warn("No base found nearby")
         end
     end
 })
