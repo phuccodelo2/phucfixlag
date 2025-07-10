@@ -128,6 +128,36 @@ MainTab:AddToggle({
     end
 })
 
+MainTab:AddButton({
+    Title = "Lure Base",
+    Description = "Đặt ESP vào base gần nhất",
+    Callback = function()
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+
+        local closestPos = nil
+        local closestDist = math.huge
+
+        for _, pos in pairs(basePositions) do
+            local dist = (hrp.Position - pos).Magnitude
+            if dist < closestDist then
+                closestDist = dist
+                closestPos = pos
+            end
+        end
+
+        if closestPos then
+            getgenv()._espTargetPosition = closestPos
+            getgenv()._espLock = true
+            print("save your base you stay at home new save ", tostring(closestPos))
+        else
+            warn("error")
+        end
+    end
+})
+
 -- ✅ Toggle: Anti-Hit
 local dodgeFly = false
 MainTab:AddToggle({
@@ -139,58 +169,7 @@ MainTab:AddToggle({
     end
 })
 
-getgenv()._espLock = false
 
-MainTab:AddToggle({
-    Title = "ESP Lock (Ẩn)",
-    Description = "Kích hoạt ESP nội bộ không hiển thị",
-    Default = false,
-    Callback = function(state)
-        getgenv()._espLock = state
-    end
-})
-
-MainTab:AddButton({
-    Title = "Fly to Locked ESP",
-    Description = "Bay đến vị trí đã ESP Lock (ẩn)",
-    Callback = function()
-        local Players = game:GetService("Players")
-        local LocalPlayer = Players.LocalPlayer
-        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hrp = char:WaitForChild("HumanoidRootPart")
-
-        if not getgenv()._espLock or not getgenv()._espTargetPosition then
-            warn("ESP Lock chưa bật hoặc chưa có vị trí lock")
-            return
-        end
-
-        -- Tele lên cao tránh vướng
-        hrp.CFrame = CFrame.new(hrp.Position + Vector3.new(0, 50, 0))
-
-        -- Bắt đầu bay đến mục tiêu
-        local speed = 30
-        local connection
-        connection = game:GetService("RunService").Heartbeat:Connect(function(dt)
-            if not getgenv()._espLock or not getgenv()._espTargetPosition then
-                connection:Disconnect()
-                return
-            end
-
-            local pos = hrp.Position
-            local target = getgenv()._espTargetPosition
-            local direction = (target - pos).Unit
-            local distance = (target - pos).Magnitude
-
-            -- Dừng nếu tới gần mục tiêu
-            if distance < 5 then
-                connection:Disconnect()
-                return
-            end
-
-            hrp.Velocity = direction * speed
-        end)
-    end
-})
 
 task.spawn(function()
     while task.wait(0.02) do
