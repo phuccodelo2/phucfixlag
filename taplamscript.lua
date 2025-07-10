@@ -119,23 +119,31 @@ MainTab:AddButton({
     end
 })
 
--- ✅ Toggle: Godmode
+-- ✅ Toggle: Godmode (chống đứng)
 local godConn
 MainTab:AddToggle({
     Title = "Godmode",
     Description = "Giữ máu luôn ở mức 100",
     Default = false,
     Callback = function(state)
-        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hum = char:WaitForChild("Humanoid")
-        if state then
-            if godConn then godConn:Disconnect() end
-            godConn = hum:GetPropertyChangedSignal("Health"):Connect(function()
-                if hum.Health < 100 then hum.Health = 100 end
+        task.spawn(function()
+            local success, char = pcall(function()
+                return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
             end)
-        else
-            if godConn then godConn:Disconnect() godConn = nil end
-        end
+            if not success or not char then return end
+
+            local hum = char:FindFirstChild("Humanoid")
+            if not hum then return end
+
+            if state then
+                if godConn then godConn:Disconnect() end
+                godConn = hum:GetPropertyChangedSignal("Health"):Connect(function()
+                    if hum.Health < 100 then hum.Health = 100 end
+                end)
+            else
+                if godConn then godConn:Disconnect() godConn = nil end
+            end
+        end)
     end
 })
 
@@ -151,18 +159,20 @@ MainTab:AddToggle({
 })
 task.spawn(function()
     while task.wait(0.02) do
-        if dodgeFly and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local myHRP = LocalPlayer.Character.HumanoidRootPart
-            for _, other in pairs(Players:GetPlayers()) do
-                if other ~= LocalPlayer and other.Character and other.Character:FindFirstChild("HumanoidRootPart") then
-                    local theirHRP = other.Character.HumanoidRootPart
-                    if (myHRP.Position - theirHRP.Position).Magnitude < 7 then
-                        myHRP.CFrame = myHRP.CFrame + Vector3.new(0, 10, 0)
-                        break
+        pcall(function()
+            if dodgeFly and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local myHRP = LocalPlayer.Character.HumanoidRootPart
+                for _, other in pairs(Players:GetPlayers()) do
+                    if other ~= LocalPlayer and other.Character and other.Character:FindFirstChild("HumanoidRootPart") then
+                        local theirHRP = other.Character.HumanoidRootPart
+                        if (myHRP.Position - theirHRP.Position).Magnitude < 7 then
+                            myHRP.CFrame = myHRP.CFrame + Vector3.new(0, 10, 0)
+                            break
+                        end
                     end
                 end
             end
-        end
+        end)
     end
 end)
 
@@ -176,10 +186,13 @@ MainTab:AddToggle({
         if state then
             if jumpConn then jumpConn:Disconnect() end
             jumpConn = UIS.JumpRequest:Connect(function()
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("Humanoid") then
-                    char:FindFirstChild("Humanoid"):ChangeState("Jumping")
-                end
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    local hum = char and char:FindFirstChild("Humanoid")
+                    if hum then
+                        hum:ChangeState("Jumping")
+                    end
+                end)
             end)
         else
             if jumpConn then jumpConn:Disconnect() jumpConn = nil end
@@ -187,30 +200,32 @@ MainTab:AddToggle({
     end
 })
 
--- ✅ Nút: Lure Base (ESP Lock gần nhất)
+-- ✅ Nút: Lure Base
 MainTab:AddButton({
     Title = "Lure Base",
-    Description = "To save your base you must be in your base. ",
+    Description = "Đặt ESP vào base gần nhất",
     Callback = function()
-        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
+        task.spawn(function()
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
 
-        local closestPos = nil
-        local closestDist = math.huge
-        for _, pos in pairs(basePositions) do
-            local dist = (hrp.Position - pos).Magnitude
-            if dist < closestDist then
-                closestDist = dist
-                closestPos = pos
+            local closestPos = nil
+            local closestDist = math.huge
+            for _, pos in pairs(basePositions) do
+                local dist = (hrp.Position - pos).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    closestPos = pos
+                end
             end
-        end
 
-        if closestPos then
-            getgenv()._espTargetPosition = closestPos
-            getgenv()._espLock = true
-            print("Saved base location at:", tostring(closestPos))
-        else
-            warn("No base found nearby")
-        end
+            if closestPos then
+                getgenv()._espTargetPosition = closestPos
+                getgenv()._espLock = true
+                print("Saved base at:", tostring(closestPos))
+            else
+                warn("No base found.")
+            end
+        end)
     end
 })
