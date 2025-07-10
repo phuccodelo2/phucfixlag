@@ -56,20 +56,18 @@ toggleButton.MouseButton1Click:Connect(function()
     Window:Minimize(not isFluentVisible)
 end)
 
--- ⬇️ Tab chính
-local MainTab = Window:AddTab({
-    Title = "main",
-    Icon = "home"
-})
+-- ⬇️ Tabs
+local MainTab = Window:AddTab({ Title = "main", Icon = "home" })
+local UtilityTab = Window:AddTab({ Title = "utility", Icon = "settings" })
 
--- ⬇️ Service & biến toàn cục
+-- ⬇️ Dịch vụ & biến toàn cục
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UIS = game:GetService("UserInputService")
-getgenv()._espLock = false
 getgenv()._espTargetPosition = nil
+getgenv()._espLock = false
 
--- ⬇️ Danh sách toạ độ base
+-- ⬇️ Toạ độ base
 local basePositions = {
     Vector3.new(-519.3, 12.9, -134.7),
     Vector3.new(-519.4, 12.9, -25.7),
@@ -81,60 +79,51 @@ local basePositions = {
     Vector3.new(-299.5, 12.9, 254.9)
 }
 
--- ✅ Nút: Ascend to Floor 1
+-- ⬇️ Các nút trong tab MAIN
 MainTab:AddButton({
     Title = "Ascend to Floor 1",
-    Description = "Chạy script Floor 1 từ GitHub",
+    Description = "Chạy script Floor 1",
     Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/phuccodelo2/Bot_discord-/refs/heads/main/tungtung.txt"))()
     end
 })
 
--- ✅ Nút: Ascend to Floor 2
 MainTab:AddButton({
     Title = "Ascend to Floor 2",
-    Description = "Chạy script Floor 2 từ GitHub",
+    Description = "Chạy script Floor 2",
     Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/phuccodelo2/Bot_discord-/refs/heads/main/phucmax_ui.lua"))()
     end
 })
 
--- ✅ Nút: Fall Down
 MainTab:AddButton({
     Title = "Fall Down",
-    Description = "Dịch chuyển nhân vật xuống 100 đơn vị",
+    Description = "Dịch chuyển xuống 100",
     Callback = function()
         local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if hrp then hrp.CFrame = hrp.CFrame - Vector3.new(0, 100, 0) end
     end
 })
 
--- ✅ Nút: Teleport Sky
 MainTab:AddButton({
     Title = "Teleport Sky",
-    Description = "Dịch chuyển nhân vật lên 200 đơn vị",
+    Description = "Dịch chuyển lên 200",
     Callback = function()
         local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if hrp then hrp.CFrame = hrp.CFrame + Vector3.new(0, 200, 0) end
     end
 })
 
--- ✅ Toggle: Godmode (chống đứng)
+-- ⬇️ Các toggle/nút trong tab UTILITY
 local godConn
-MainTab:AddToggle({
+UtilityTab:AddToggle({
     Title = "Godmode",
-    Description = "Giữ máu luôn ở mức 100",
+    Description = "Giữ máu luôn 100",
     Default = false,
     Callback = function(state)
         task.spawn(function()
-            local success, char = pcall(function()
-                return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-            end)
-            if not success or not char then return end
-
-            local hum = char:FindFirstChild("Humanoid")
-            if not hum then return end
-
+            local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+            local hum = char:WaitForChild("Humanoid")
             if state then
                 if godConn then godConn:Disconnect() end
                 godConn = hum:GetPropertyChangedSignal("Health"):Connect(function()
@@ -147,11 +136,10 @@ MainTab:AddToggle({
     end
 })
 
--- ✅ Toggle: Anti-Hit
 local dodgeFly = false
-MainTab:AddToggle({
+UtilityTab:AddToggle({
     Title = "Anti-Hit",
-    Description = "Tự động né lên trên khi có người lại gần",
+    Description = "Né đòn khi có người tới gần",
     Default = false,
     Callback = function(state)
         dodgeFly = state
@@ -176,23 +164,19 @@ task.spawn(function()
     end
 end)
 
--- ✅ Toggle: Infinite Jump
 local jumpConn
-MainTab:AddToggle({
+UtilityTab:AddToggle({
     Title = "Infinite Jump",
-    Description = "Cho phép nhảy liên tục trên không",
+    Description = "Nhảy liên tục",
     Default = false,
     Callback = function(state)
         if state then
             if jumpConn then jumpConn:Disconnect() end
             jumpConn = UIS.JumpRequest:Connect(function()
-                pcall(function()
-                    local char = LocalPlayer.Character
-                    local hum = char and char:FindFirstChild("Humanoid")
-                    if hum then
-                        hum:ChangeState("Jumping")
-                    end
-                end)
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("Humanoid") then
+                    char:FindFirstChild("Humanoid"):ChangeState("Jumping")
+                end
             end)
         else
             if jumpConn then jumpConn:Disconnect() jumpConn = nil end
@@ -200,10 +184,9 @@ MainTab:AddToggle({
     end
 })
 
--- ✅ Nút: Lure Base
-MainTab:AddButton({
+UtilityTab:AddButton({
     Title = "Lure Base",
-    Description = "Đặt ESP vào base gần nhất",
+    Description = "ESP base gần nhất",
     Callback = function()
         task.spawn(function()
             local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -222,9 +205,9 @@ MainTab:AddButton({
             if closestPos then
                 getgenv()._espTargetPosition = closestPos
                 getgenv()._espLock = true
-                print("Saved base at:", tostring(closestPos))
+                print("Locked to base:", tostring(closestPos))
             else
-                warn("No base found.")
+                warn("No base found")
             end
         end)
     end
