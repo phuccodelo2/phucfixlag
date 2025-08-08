@@ -1,0 +1,291 @@
+-- RSpy for melee attacks + UI copy
+-- Works with popular executors (Trigon / KRNL / Synapse-like).
+-- NOTE: Requires metamethod hook capability (getrawmetatable/newcclosure/etc).
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- UI Creation (CoreGui)
+local core = game:GetService("CoreGui")
+if core:FindFirstChild("RSpyToolUI") then core.RSpyToolUI:Destroy() end
+
+local screen = Instance.new("ScreenGui")
+screen.Name = "RSpyToolUI"
+screen.ResetOnSpawn = false
+screen.Parent = core
+
+local frame = Instance.new("Frame", screen)
+frame.Size = UDim2.new(0, 520, 0, 360)
+frame.Position = UDim2.new(0.5, -260, 0.5, -180)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.Active = true
+frame.Draggable = true
+frame.BorderSizePixel = 0
+
+local uic = Instance.new("UICorner", frame)
+uic.CornerRadius = UDim.new(0,8)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.Position = UDim2.new(0,0,0,0)
+title.BackgroundTransparency = 1
+title.Text = "RSpy - Tool Attack Logger"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+
+-- Buttons
+local btnCopy = Instance.new("TextButton", frame)
+btnCopy.Size = UDim2.new(0,120,0,28)
+btnCopy.Position = UDim2.new(0,10,0,40)
+btnCopy.Text = "Sao chép"
+btnCopy.Font = Enum.Font.Gotham
+btnCopy.TextSize = 14
+btnCopy.BackgroundColor3 = Color3.fromRGB(40,120,255)
+Instance.new("UICorner", btnCopy)
+
+local btnClear = Instance.new("TextButton", frame)
+btnClear.Size = UDim2.new(0,80,0,28)
+btnClear.Position = UDim2.new(0,140,0,40)
+btnClear.Text = "Clear"
+btnClear.Font = Enum.Font.Gotham
+btnClear.TextSize = 14
+btnClear.BackgroundColor3 = Color3.fromRGB(200,80,80)
+Instance.new("UICorner", btnClear)
+
+local infoLbl = Instance.new("TextLabel", frame)
+infoLbl.Size = UDim2.new(0,360,0,28)
+infoLbl.Position = UDim2.new(0,240,0,40)
+infoLbl.BackgroundTransparency = 1
+infoLbl.TextColor3 = Color3.fromRGB(200,200,200)
+infoLbl.Text = "Logs: 0  |  Highlight: events while holding tool"
+infoLbl.TextXAlignment = Enum.TextXAlignment.Right
+infoLbl.Font = Enum.Font.Gotham
+infoLbl.TextSize = 12
+
+-- ScrollingFrame to list logs
+local scroll = Instance.new("ScrollingFrame", frame)
+scroll.Position = UDim2.new(0,10,0,80)
+scroll.Size = UDim2.new(1,-20,0,250)
+scroll.CanvasSize = UDim2.new(0,0,0,0)
+scroll.BackgroundColor3 = Color3.fromRGB(22,22,22)
+scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 6
+Instance.new("UICorner", scroll)
+
+local uiList = Instance.new("UIListLayout", scroll)
+uiList.Padding = UDim.new(0,4)
+uiList.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Details box
+local detail = Instance.new("TextBox", frame)
+detail.Size = UDim2.new(1,-20,0,28)
+detail.Position = UDim2.new(0,10,1,-38)
+detail.ClearTextOnFocus = false
+detail.Text = "-- Select a log to see details --"
+detail.TextWrapped = true
+detail.TextXAlignment = Enum.TextXAlignment.Left
+detail.TextYAlignment = Enum.TextYAlignment.Center
+detail.Font = Enum.Font.Code
+detail.TextSize = 14
+detail.BackgroundColor3 = Color3.fromRGB(18,18,18)
+Instance.new("UICorner", detail)
+
+-- Internal storage
+local logs = {} -- { {id=..., remote=tostring(self), method=..., args=..., when=os.time(), holdingTool=bool} }
+local selectedLogIndex = nil
+
+-- helper: simple serializer for args
+local function serializeArg(v)
+    local t = typeof(v)
+    if t == "Instance" then
+        return ("Instance(%s)"):format(v:GetFullName())
+    elseif t == "Vector3" then
+        return ("Vector3.new(%.3f, %.3f, %.3f)"):format(v.X, v.Y, v.Z)
+    elseif t == "CFrame" then
+        local p = v.Position
+        return ("CFrame.new(%.3f, %.3f, %.3f)"):format(p.X, p.Y, p.Z)
+    elseif t == "table" then
+        -- shallow print first-level
+        local ok, json = pcall(function() return HttpService:JSONEncode(v) end)
+        if ok then return json end
+        return "{table}"
+    elseif t == "string" then
+        return ("%q"):format(v)
+    else
+        return tostring(v)
+    end
+end
+
+local function serializeArgs(argTbl)
+    local parts = {}
+    for i=1,#argTbl do
+        parts[#parts+1] = serializeArg(argTbl[i])
+    end
+    return table.concat(parts, ", ")
+end
+
+-- UI helper: add log entry to scroll
+local function addLogEntry(entry)
+    local btn = Instance.new("TextButton", scroll)
+    btn.Size = UDim2.new(1, -12, 0, 28)
+    btn.BackgroundColor3 = entry.holdingTool and Color3.fromRGB(45,45,80) or Color3.fromRGB(36,36,36)
+    btn.TextColor3 = Color3.fromRGB(220,220,220)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 12
+    btn.AutoButtonColor = false
+    btn.Text = string.format("[%d] %s : %s", #logs, entry.method, entry.remote)
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.LayoutOrder = #logs
+
+    local corner = Instance.new("UICorner", btn)
+    corner.CornerRadius = UDim.new(0,6)
+
+    btn.MouseButton1Click:Connect(function()
+        selectedLogIndex = entry.id
+        local s = ("Remote: %s\nMethod: %s\nArgs: %s\nTime: %s\nHoldingTool: %s")
+        local tstr = os.date("%X", entry.when)
+        detail.Text = s:format(entry.remote, entry.method, entry.args or "nil", tstr, tostring(entry.holdingTool))
+        -- highlight selection
+        for i,child in pairs(scroll:GetChildren()) do
+            if child:IsA("TextButton") then
+                child.BackgroundColor3 = Color3.fromRGB(36,36,36)
+            end
+        end
+        btn.BackgroundColor3 = Color3.fromRGB(75,75,120)
+    end)
+
+    -- update canvas size
+    RunService.Heartbeat:Once(function()
+        local total = uiList.AbsoluteContentSize.Y
+        scroll.CanvasSize = UDim2.new(0,0,0, total + 8)
+    end)
+end
+
+-- copy button
+btnCopy.MouseButton1Click:Connect(function()
+    if not selectedLogIndex then
+        -- if none selected copy last
+        if #logs == 0 then return end
+        selectedLogIndex = logs[#logs].id
+    end
+    local log = nil
+    for _,v in ipairs(logs) do if v.id == selectedLogIndex then log = v break end end
+    if not log then return end
+    local text = ("-- RSpy Copy --\nRemote: %s\nMethod: %s\nArgs: %s\nTime: %s\nHoldingTool: %s")
+    local tstr = os.date("%c", log.when)
+    local out = text:format(log.remote, log.method, log.args or "nil", tstr, tostring(log.holdingTool))
+    if setclipboard then
+        pcall(setclipboard, out)
+    else
+        -- fallback print
+        print(out)
+    end
+end)
+
+btnClear.MouseButton1Click:Connect(function()
+    for _,c in ipairs(scroll:GetChildren()) do
+        if c:IsA("TextButton") then c:Destroy() end
+    end
+    logs = {}
+    selectedLogIndex = nil
+    infoLbl.Text = "Logs: 0  |  Highlight: events while holding tool"
+    detail.Text = "-- Select a log to see details --"
+    scroll.CanvasSize = UDim2.new(0,0,0,0)
+end)
+
+-- detect if player currently holding a tool (melee)
+local function isHoldingTool()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    for _,v in ipairs(char:GetChildren()) do
+        if v:IsA("Tool") then
+            return true, v -- return tool as second
+        end
+    end
+    return false
+end
+
+-- Hook __namecall
+local success, err = pcall(function()
+    local mt = getrawmetatable(game)
+    local old = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "FireServer" or method == "InvokeServer" then
+            local holding, ttool = isHoldingTool()
+            -- capture args
+            local args = {...}
+            local serial = ""
+            pcall(function() serial = serializeArgs(args) end)
+            local entry = {
+                id = (tick()*1000), -- unique-ish
+                remote = tostring(self),
+                method = method,
+                args = serial,
+                when = os.time(),
+                holdingTool = holding
+            }
+            table.insert(logs, entry)
+            addLogEntry(entry)
+            infoLbl.Text = string.format("Logs: %d  |  Highlight: events while holding tool", #logs)
+        end
+        return old(self, ...)
+    end)
+    setreadonly(mt, true)
+end)
+if not success then
+    warn("RSpy: Hook failed (executor might block metamethod). Error:", err)
+end
+
+-- small helper: also capture Tool.Activated events while holding (additional indicator)
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            child.Activated:Connect(function()
+                local holding, _ = isHoldingTool()
+                local entry = {
+                    id = (tick()*1000),
+                    remote = "<ToolActivated>",
+                    method = "Activated",
+                    args = child.Name,
+                    when = os.time(),
+                    holdingTool = true
+                }
+                table.insert(logs, entry)
+                addLogEntry(entry)
+                infoLbl.Text = string.format("Logs: %d  |  Highlight: events while holding tool", #logs)
+            end)
+        end
+    end)
+end)
+
+-- initial: if tool already in character attach
+local startedChar = LocalPlayer.Character
+if startedChar then
+    for _,child in ipairs(startedChar:GetChildren()) do
+        if child:IsA("Tool") then
+            child.Activated:Connect(function()
+                local entry = {
+                    id = (tick()*1000),
+                    remote = "<ToolActivated>",
+                    method = "Activated",
+                    args = child.Name,
+                    when = os.time(),
+                    holdingTool = true
+                }
+                table.insert(logs, entry)
+                addLogEntry(entry)
+                infoLbl.Text = string.format("Logs: %d  |  Highlight: events while holding tool", #logs)
+            end)
+        end
+    end
+end
+
+-- End of script
+print("RSpy Tool Logger loaded. Hold melee and attack to capture remotes. Select a log and press Sao chép.")
